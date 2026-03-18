@@ -68,7 +68,7 @@ async function runQBOBatchTask() {
     console.log("\n[1] → Navigating to login page");
     await page.goto("https://misterquik.sera.tech/admins/login", {
       waitUntil: "domcontentloaded",
-      timeout: 60000,
+      timeoutMs: 60000,
     });
     await page.waitForTimeout(2000);
 
