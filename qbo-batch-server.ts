@@ -356,7 +356,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       //   );
       // }
 
-     // ------------------------------------------------------------------
+// ------------------------------------------------------------------
 // STEP 6 — Back to Invoices tab
 // ------------------------------------------------------------------
 console.log("\n[6] → Back to Invoices tab");
@@ -370,6 +370,7 @@ await page.waitForTimeout(3000);
 const invoiceNoneSelected: boolean = await page.evaluate(() =>
   /total invoices?[:\s]*none selected/i.test(document.body.textContent || "")
 );
+
 if (invoiceNoneSelected) {
   console.log("    INFO: Header shows Total Invoices: None Selected");
 }
@@ -378,47 +379,35 @@ if (invoiceCount === 0 || invoiceNoneSelected) {
   context.noInvoices = true;
   context.completionMessage = "No records found.";
   console.log("    ✅ No invoices to batch");
-
 } else {
   // ------------------------------------------------------------------
-  // STEP 7 — Select ALL invoices with retry and row visibility check
+  // STEP 7 — Select ALL invoices with retries
   // ------------------------------------------------------------------
   console.log(`\n[7] → Selecting all ${invoiceCount} invoice(s)`);
 
-  // Wait until at least one row is visible
-  try {
-    await waitUntilVisible(page, "tbody tr", 10000);
-    console.log("    ✅ Invoice rows are visible");
-  } catch (err) {
-    console.log("    ⚠️ No invoice rows visible — marking noInvoices = true");
-    context.noInvoices = true;
-    context.completionMessage = "No records found.";
+  let selectedCount = 0;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    selectedCount = await page.evaluate(() => {
+      const cb = document.querySelector(
+        "thead input[type='checkbox'], th input[type='checkbox']"
+      ) as HTMLInputElement | null;
+      if (cb && !cb.checked) cb.click();
+      return Array.from(
+        document.querySelectorAll('tbody input[type="checkbox"]:checked')
+      ).length;
+    });
+
+    console.log(`    Attempt ${attempt} → ${selectedCount} invoice(s) selected`);
+    if (selectedCount > 0) break;
+    await page.waitForTimeout(2000);
   }
 
-  if (!context.noInvoices) {
-    let selectedCount = 0;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      selectedCount = await page.evaluate(() => {
-        const cb = document.querySelector(
-          "thead input[type='checkbox'], th input[type='checkbox']"
-        ) as HTMLInputElement | null;
-        if (cb && !cb.checked) cb.click();
-        return Array.from(
-          document.querySelectorAll('tbody input[type="checkbox"]:checked')
-        ).length;
-      });
-      console.log(`    Attempt ${attempt} → ${selectedCount} invoice(s) selected`);
-      if (selectedCount > 0) break;
-      await page.waitForTimeout(2000);
-    }
-
-    if (selectedCount === 0) {
-      console.log("    ⚠️ Could not select any invoices — marking noInvoices = true");
-      context.noInvoices = true;
-      context.completionMessage = "No records found.";
-    } else {
-      console.log(`    ✅ ${selectedCount} invoice(s) selected`);
-    }
+  if (selectedCount === 0) {
+    console.log("    ⚠️ Could not select any invoices — marking noInvoices = true");
+    context.noInvoices = true;
+    context.completionMessage = "No records found.";
+  } else {
+    console.log(`    ✅ ${selectedCount} invoice(s) selected`);
   }
 }
 
