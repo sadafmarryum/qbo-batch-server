@@ -327,8 +327,8 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
         context.noInvoices = true;
         context.completionMessage = "No records found.";
         console.log("    ✅ Header shows no invoices selected — returning No records found");
-        return;
-      }
+        // Do not return here — fall through to finally block so result is always returned
+      } else {
 
       if (headerTotals.paymentNoneSelected) {
         console.log("    ✅ Perfect — invoices selected, Total Payments: None Selected");
@@ -512,6 +512,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       console.log(`\n✅ Done:\n${context.completionMessage}`);
     }
 
+      } // end else (invoiceTotal valid)
   } catch (error: any) {
     console.error(`\n❌ Task error: ${error.message}`);
     context.taskError = error.message;
@@ -578,8 +579,9 @@ app.post("/run-qbo-batch", (req, res) => {
   jobs.set(jobId, job);
 
   runQBOBatchTask({ testInvoiceUrl })
-    .then((result: Record<string, any>) => {
-      job.status = result["success"] ? "done" : "failed";
+    .then((result) => {
+      if (!result) return;
+      job.status = result.success ? "done" : "failed";
       job.result = result;
       console.log(`\n✅ Job ${jobId} → ${job.status}`);
     })
