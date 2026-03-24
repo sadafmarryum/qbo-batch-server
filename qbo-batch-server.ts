@@ -602,7 +602,13 @@ app.get("/job-status/:jobId", (req, res) => {
   }
 
   const response = { jobId: job.id, status: job.status, ...(job.result || {}), ...(job.error ? { error: job.error } : {}) };
-  jobs.delete(job.id);
+  // jobs.delete(job.id);
+ // DELETE JOB AFTER 15 MINUTES
+  setTimeout(() => {
+    jobs.delete(job.id);
+    console.log(`🗑️ Job ${job.id} removed from memory after 15 min`);
+  }, 15 * 60 * 1000);
+  
   res.json(response);
 });
 
