@@ -602,7 +602,8 @@ app.get("/job-status/:jobId", (req, res) => {
     return res.json({ jobId: job.id, status: "running", elapsedMinutes: parseFloat(elapsed) });
   }
 
-  const response = { jobId: job.id, status: job.status, ...(job.result || {}), ...(job.error ? { error: job.error } : {}) };
+  const resultData: Record<string, any> = job.result ?? {};
+  const response = { jobId: job.id, status: job.status, ...resultData, ...(job.error ? { error: job.error } : {}) };
   jobs.delete(job.id);
   res.json(response);
 });
