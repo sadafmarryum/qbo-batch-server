@@ -578,8 +578,8 @@ app.post("/run-qbo-batch", (req, res) => {
   jobs.set(jobId, job);
 
   runQBOBatchTask({ testInvoiceUrl })
-    .then(result => {
-      job.status = result.success ? "done" : "failed";
+    .then((result: Record<string, any>) => {
+      job.status = result["success"] ? "done" : "failed";
       job.result = result;
       console.log(`\n✅ Job ${jobId} → ${job.status}`);
     })
