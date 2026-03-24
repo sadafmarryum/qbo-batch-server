@@ -511,7 +511,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
 
       context.batchCreated = true;
       context.completionMessage = [
-        `**Mode:** ${isTestMode ? "TEST (single invoice)" : "PRODUCTION (all invoices)"}`,
+        // `**Mode:** ${isTestMode ? "TEST (single invoice)" : "PRODUCTION (all invoices)"}`,
         `**Invoice Processing:** Selected ${invoiceCount} invoice(s) on the 'Invoices' tab.`,
         `**Batch Creation:** Created ${batchLabel}.`,
         `   - **Total Invoices:** ${context.invoiceAmount} (${context.invoiceItems} items)`,
