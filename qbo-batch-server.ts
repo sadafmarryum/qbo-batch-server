@@ -2,8 +2,10 @@
 // Single file — Express server + Stagehand task
 // Deploy on Render, call from n8n Schedule Trigger via POST /run-qbo-batch
 //
+// n8n HTTP Request node — set Timeout: 900000 (15 min) in Options
+//
 // TEST MODE: POST /run-qbo-batch with body { "testInvoiceUrl": "https://..." }
-// PROD MODE: POST /run-qbo-batch with no body (uses default unbatched URL)
+// PROD MODE: POST /run-qbo-batch with empty body {}
 
 import { Stagehand } from "@browserbasehq/stagehand";
 import express from "express";
@@ -45,10 +47,8 @@ async function sleepWithCountdown(page: any, totalMs: number, intervalMs = 30000
   }
 }
 
-// Uncheck every checkbox on the currently visible tab. Returns count unchecked.
 async function deselectAllOnCurrentTab(page: any): Promise<number> {
   return await page.evaluate(() => {
-    // Try header/select-all first — one click deselects all rows
     const headerCb = document.querySelector(
       'thead input[type="checkbox"], th input[type="checkbox"]'
     ) as HTMLInputElement | null;
@@ -56,7 +56,6 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
       headerCb.click();
       return 1;
     }
-    // Fallback: uncheck every row individually
     const rowCbs = Array.from(
       document.querySelectorAll('tbody input[type="checkbox"]:checked')
     ) as HTMLInputElement[];
@@ -65,9 +64,7 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
   });
 }
 
-// Click a tab by name (Invoices / Payments). Retries up to 5x.
 async function clickTab(page: any, tabName: "Invoices" | "Payments"): Promise<boolean> {
-  const regex = tabName === "Invoices" ? /^invoices/i : /^payments/i;
   for (let attempt = 0; attempt < 5; attempt++) {
     const clicked = await page.evaluate((pattern: string) => {
       const re = new RegExp(pattern, "i");
@@ -97,10 +94,8 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
   const startTime = Date.now();
   const context: any = {};
 
-  // In test mode we navigate to the specific invoice URL so we only touch
-  // one invoice and don't burn the full live batch.
-  const isTestMode    = !!options.testInvoiceUrl;
-  const unbatchedUrl  = options.testInvoiceUrl || "https://misterquik.sera.tech/accounting/unbatched";
+  const isTestMode   = !!options.testInvoiceUrl;
+  const unbatchedUrl = options.testInvoiceUrl || "https://misterquik.sera.tech/accounting/unbatched";
 
   console.log(isTestMode
     ? `\n🧪 TEST MODE — URL: ${unbatchedUrl}`
@@ -172,12 +167,11 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     }
 
     // ------------------------------------------------------------------
-    // STEP 2 — Navigate to unbatched page (test URL or full URL)
+    // STEP 2 — Navigate to unbatched page
     // ------------------------------------------------------------------
     console.log(`\n[2] → Navigating to: ${unbatchedUrl}`);
     await page.goto(unbatchedUrl);
 
-    // Wait 5 min in prod so all data settles; shorter wait in test mode
     if (isTestMode) {
       console.log("\n[2b] → Test mode — waiting 15 seconds for page to load");
       await page.waitForTimeout(15000);
@@ -188,10 +182,10 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     }
 
     // ------------------------------------------------------------------
-    // STEP 3 — Read BOTH tab labels to get correct counts
-    //   "Invoices (13)" = 13 invoices   ← use this, NOT the footer
+    // STEP 3 — Read BOTH tab labels for correct counts
+    //   "Invoices (13)" = 13 invoices  ← use this, NOT the footer
     //   "Payments (16)" = 16 payments
-    //   Footer "29 items" = combined    ← NEVER use
+    //   Footer "29 items" = combined   ← NEVER use
     // ------------------------------------------------------------------
     console.log("\n[3] → Reading tab labels for correct counts");
 
@@ -232,13 +226,11 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     console.log(`    ℹ️  Invoice tab: "${tabCounts.invoiceTabLabel}" → ${tabCounts.invoiceCount}`);
     console.log(`    ℹ️  Payment tab: "${tabCounts.paymentTabLabel}" → ${tabCounts.paymentCount}`);
 
-    // In test mode with a single invoice URL the tab may show "Invoices (1)"
     const invoiceCount = tabCounts.invoiceCount;
     context.invoiceCount = invoiceCount;
 
     // ------------------------------------------------------------------
     // STEP 4 — Invoices tab → deselect everything first
-    //   (page may have loaded with rows pre-selected)
     // ------------------------------------------------------------------
     console.log("\n[4] → Invoices tab — deselecting any pre-selected rows");
     await clickTab(page, "Invoices");
@@ -260,7 +252,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     console.log(`    ℹ️  Deselected ${payDeselected} payment row(s)`);
     await page.waitForTimeout(1500);
 
-    // Confirm header shows "Total Payments: None Selected"
     let paymentsNoneSelected: boolean = await page.evaluate(() =>
       /total payments?[:\s]*none selected/i.test(document.body.textContent || "")
     );
@@ -299,8 +290,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     } else {
       // ------------------------------------------------------------------
       // STEP 7 — Select ALL invoices via header checkbox
-      //   In test mode this will select only the 1 filtered invoice.
-      //   In prod mode this selects all invoices on the Invoices tab.
       // ------------------------------------------------------------------
       console.log(`\n[7] → Selecting all ${invoiceCount} invoice(s)`);
       const selectAllClicked = await page.evaluate(() => {
@@ -316,8 +305,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       if (!selectAllClicked) throw new Error("Select All checkbox not found on Invoices tab");
       await page.waitForTimeout(2000);
 
-      // Read header — should show:
-      //   Total Invoices: $X,XXX.XX    Total Payments: None Selected
       const headerTotals = await page.evaluate(() => {
         const bodyText = document.body.textContent || "";
         const invMatch = bodyText.match(/total invoices?[:\s]*\$?([\d,]+\.?\d*)/i);
@@ -339,7 +326,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       if (headerTotals.paymentNoneSelected) {
         console.log("    ✅ Perfect — invoices selected, Total Payments: None Selected");
       } else {
-        // One more retry: go to payments, deselect, come back, re-select invoices
         console.log("    ⚠️  Payments not 'None Selected' — doing one final retry");
         await clickTab(page, "Payments");
         await page.waitForTimeout(2000);
@@ -383,7 +369,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
 
       // ------------------------------------------------------------------
       // STEP 9 — Read modal — HARD safety gate
-      //   Parse line-by-line so invoice $ never bleeds into payment field
       // ------------------------------------------------------------------
       console.log("\n[9] → Reading batch modal");
       await waitUntilVisible(page, '.modal, [role="dialog"], .modal-content, .sera-modal', 15000);
@@ -432,7 +417,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
           }
         }
 
-        // Fallback for single-line modal
         if (!invoiceAmount) {
           const m = text.match(/invoices?\s*\$\s*([\d,]+\.\d{2})/i);
           if (m) invoiceAmount = `$${m[1]}`;
@@ -461,7 +445,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       console.log(`    ℹ️  Invoices:   ${modalDetails.invoiceAmount} (${modalDetails.invoiceItems} items)`);
       console.log(`    ℹ️  Payments:   ${modalDetails.paymentAmount} (${modalDetails.paymentItems} items)`);
 
-      // ── HARD ABORT — if any payment items in batch, stop now ──────────
+      // HARD ABORT — if any payment items in batch, stop now
       if (modalDetails.paymentItems > 0) {
         throw new Error(
           `Modal shows ${modalDetails.paymentItems} payment item(s) — aborting. Only invoices should be batched.`
@@ -511,7 +495,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
 
       context.batchCreated = true;
       context.completionMessage = [
-        // `**Mode:** ${isTestMode ? "TEST (single invoice)" : "PRODUCTION (all invoices)"}`,
         `**Invoice Processing:** Selected ${invoiceCount} invoice(s) on the 'Invoices' tab.`,
         `**Batch Creation:** Created ${batchLabel}.`,
         `   - **Total Invoices:** ${context.invoiceAmount} (${context.invoiceItems} items)`,
@@ -567,7 +550,6 @@ app.post("/run-qbo-batch", async (req, res) => {
   console.log(`\n📥 [${new Date().toISOString()}] POST /run-qbo-batch received`);
   console.log(`    Body: ${JSON.stringify(req.body)}`);
 
-  // Accept optional testInvoiceUrl in request body for single-invoice testing
   const testInvoiceUrl: string | undefined = req.body?.testInvoiceUrl;
 
   try {
@@ -580,12 +562,23 @@ app.post("/run-qbo-batch", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 QBO Batch Server running on port ${PORT}`);
-  console.log(`   POST /run-qbo-batch              ← production (all invoices, 5min wait)`);
-  console.log(`   POST /run-qbo-batch              ← test mode (pass testInvoiceUrl in body)`);
-  console.log(`   GET  /health                     ← Render health check\n`);
-  console.log(`   Test example:`);
-  console.log(`   curl -X POST http://localhost:3000/run-qbo-batch \\`);
-  console.log(`     -H "Content-Type: application/json" \\`);
-  console.log(`     -d '{"testInvoiceUrl":"https://misterquik.sera.tech/accounting/unbatched?tab=ub_Invoices&invoice=8691262"}'\n`);
+  console.log("\n QBO Batch Server running on port " + PORT);
+  console.log("   POST /run-qbo-batch  <- n8n calls this (set Timeout: 900000 in Options)");
+  console.log("   GET  /health         <- Render health check\n");
+
+  // Self-ping every 4 minutes to keep Render free tier awake
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL
+    ? `${process.env.RENDER_EXTERNAL_URL}/health`
+    : `http://localhost:${PORT}/health`;
+
+  console.log("Self-ping active -> " + SELF_URL + " every 4 min\n");
+
+  setInterval(async () => {
+    try {
+      const res = await fetch(SELF_URL);
+      console.log("Self-ping -> " + res.status);
+    } catch (err: any) {
+      console.warn("Self-ping failed: " + err.message);
+    }
+  }, 4 * 60 * 1000);
 });
