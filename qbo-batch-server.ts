@@ -269,92 +269,155 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     );
     context.paymentsCleared = true;
 
-    // ------------------------------------------------------------------
-    // STEP 6 — Back to Invoices tab
-    // ------------------------------------------------------------------
-    console.log("\n[6] → Back to Invoices tab");
-    const invoicesClicked = await clickTab(page, "Invoices");
-    if (!invoicesClicked) throw new Error("Could not click Invoices tab");
-    await page.waitForTimeout(3000);
+    // // ------------------------------------------------------------------
+    // // STEP 6 — Back to Invoices tab
+    // // ------------------------------------------------------------------
+    // console.log("\n[6] → Back to Invoices tab");
+    // const invoicesClicked = await clickTab(page, "Invoices");
+    // if (!invoicesClicked) throw new Error("Could not click Invoices tab");
+    // await page.waitForTimeout(3000);
+
+    // // ------------------------------------------------------------------
+    // // NO INVOICES — bail early
+    // // ------------------------------------------------------------------
+    // // Check header for "Total Invoices: None Selected" — means 0 invoices
+    // const invoiceNoneSelected: boolean = await page.evaluate(() =>
+    //   /total invoices?[:\s]*none selected/i.test(document.body.textContent || "")
+    // );
+    // if (invoiceNoneSelected) {
+    //   console.log("    INFO: Header shows Total Invoices: None Selected");
+    // }
+
+    // if (invoiceCount === 0 || invoiceNoneSelected) {
+    //   context.noInvoices = true;
+    //   context.completionMessage = "No records found.";
+    //   console.log("    ✅ No invoices to batch");
+
+    // } else {
+      // // ------------------------------------------------------------------
+      // // STEP 7 — Select ALL invoices via header checkbox
+      // // ------------------------------------------------------------------
+      // console.log(`\n[7] → Selecting all ${invoiceCount} invoice(s)`);
+      // const selectAllClicked = await page.evaluate(() => {
+      //   const cb = document.querySelector(
+      //     "thead input[type='checkbox'], th input[type='checkbox']"
+      //   ) as HTMLInputElement | null;
+      //   if (cb) {
+      //     if (!cb.checked) cb.click();
+      //     return true;
+      //   }
+      //   return false;
+      // });
+      // if (!selectAllClicked) throw new Error("Select All checkbox not found on Invoices tab");
+      // await page.waitForTimeout(2000);
+
+      // const headerTotals = await page.evaluate(() => {
+      //   const bodyText = document.body.textContent || "";
+      //   const invMatch = bodyText.match(/total invoices?[:\s]*\$?([\d,]+\.?\d*)/i);
+      //   const payNone  = /total payments?[:\s]*none selected/i.test(bodyText);
+      //   const snippet  = (bodyText.match(/total invoices?.{0,220}/i) || [""])[0]
+      //     .replace(/\s+/g, " ").trim();
+      //   return {
+      //     invoiceTotal:        invMatch ? `$${invMatch[1]}` : "N/A",
+      //     paymentNoneSelected: payNone,
+      //     rawHeaderText:       snippet,
+      //   };
+      // });
+
+      // console.log(`    ℹ️  Header: "${headerTotals.rawHeaderText}"`);
+      // console.log(`    ℹ️  Invoice total: ${headerTotals.invoiceTotal}`);
+      // console.log(`    ℹ️  Total Payments: None Selected = ${headerTotals.paymentNoneSelected}`);
+      // context.invoiceTotal = headerTotals.invoiceTotal;
+
+      // if (headerTotals.paymentNoneSelected) {
+      //   console.log("    ✅ Perfect — invoices selected, Total Payments: None Selected");
+      // } else {
+      //   console.log("    ⚠️  Payments not 'None Selected' — doing one final retry");
+      //   await clickTab(page, "Payments");
+      //   await page.waitForTimeout(2000);
+      //   await deselectAllOnCurrentTab(page);
+      //   await page.waitForTimeout(2000);
+      //   await clickTab(page, "Invoices");
+      //   await page.waitForTimeout(2000);
+      //   await page.evaluate(() => {
+      //     const cb = document.querySelector(
+      //       "thead input[type='checkbox'], th input[type='checkbox']"
+      //     ) as HTMLInputElement | null;
+      //     if (cb && !cb.checked) cb.click();
+      //   });
+      //   await page.waitForTimeout(2000);
+
+      //   const recheckNone = await page.evaluate(() =>
+      //     /total payments?[:\s]*none selected/i.test(document.body.textContent || "")
+      //   );
+      //   console.log(recheckNone
+      //     ? "    ✅ Confirmed: Total Payments: None Selected"
+      //     : "    ⚠️  Still not 'None Selected' — proceeding, modal is the final gate"
+      //   );
+      // }
+
 
     // ------------------------------------------------------------------
-    // NO INVOICES — bail early
-    // ------------------------------------------------------------------
-    // Check header for "Total Invoices: None Selected" — means 0 invoices
-    const invoiceNoneSelected: boolean = await page.evaluate(() =>
-      /total invoices?[:\s]*none selected/i.test(document.body.textContent || "")
-    );
-    if (invoiceNoneSelected) {
-      console.log("    INFO: Header shows Total Invoices: None Selected");
+// STEP 6 — Back to Invoices tab
+// ------------------------------------------------------------------
+console.log("\n[6] → Back to Invoices tab");
+const invoicesClicked = await clickTab(page, "Invoices");
+if (!invoicesClicked) throw new Error("Could not click Invoices tab");
+await page.waitForTimeout(3000);
+
+// ------------------------------------------------------------------
+// NO INVOICES — bail early if none visible
+// ------------------------------------------------------------------
+const invoiceNoneSelected: boolean = await page.evaluate(() =>
+  /total invoices?[:\s]*none selected/i.test(document.body.textContent || "")
+);
+if (invoiceNoneSelected) {
+  console.log("    INFO: Header shows Total Invoices: None Selected");
+}
+
+if (invoiceCount === 0 || invoiceNoneSelected) {
+  context.noInvoices = true;
+  context.completionMessage = "No records found.";
+  console.log("    ✅ No invoices to batch");
+
+} else {
+  // ------------------------------------------------------------------
+  // STEP 7 — Select ALL invoices with retry and row visibility check
+  // ------------------------------------------------------------------
+  console.log(`\n[7] → Selecting all ${invoiceCount} invoice(s)`);
+
+  // Wait until at least one row is visible
+  try {
+    await waitUntilVisible(page, "tbody tr", 10000);
+    console.log("    ✅ Invoice rows are visible");
+  } catch {
+    console.log("    ⚠️ No invoice rows visible — marking noInvoices = true");
+    context.noInvoices = true;
+    context.completionMessage = "No records found.";
+  }
+
+  if (!context.noInvoices) {
+    let selectedCount = 0;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      selectedCount = await page.evaluate(() => {
+        const cb = document.querySelector("thead input[type='checkbox'], th input[type='checkbox']") as HTMLInputElement | null;
+        if (cb && !cb.checked) cb.click();
+        return Array.from(document.querySelectorAll('tbody input[type="checkbox"]:checked')).length;
+      });
+      console.log(`    Attempt ${attempt} → ${selectedCount} invoice(s) selected`);
+      if (selectedCount > 0) break;
+      await page.waitForTimeout(2000);
     }
 
-    if (invoiceCount === 0 || invoiceNoneSelected) {
+    if (selectedCount === 0) {
+      console.log("    ⚠️ Could not select any invoices — marking noInvoices = true");
       context.noInvoices = true;
       context.completionMessage = "No records found.";
-      console.log("    ✅ No invoices to batch");
-
     } else {
-      // ------------------------------------------------------------------
-      // STEP 7 — Select ALL invoices via header checkbox
-      // ------------------------------------------------------------------
-      console.log(`\n[7] → Selecting all ${invoiceCount} invoice(s)`);
-      const selectAllClicked = await page.evaluate(() => {
-        const cb = document.querySelector(
-          "thead input[type='checkbox'], th input[type='checkbox']"
-        ) as HTMLInputElement | null;
-        if (cb) {
-          if (!cb.checked) cb.click();
-          return true;
-        }
-        return false;
-      });
-      if (!selectAllClicked) throw new Error("Select All checkbox not found on Invoices tab");
-      await page.waitForTimeout(2000);
-
-      const headerTotals = await page.evaluate(() => {
-        const bodyText = document.body.textContent || "";
-        const invMatch = bodyText.match(/total invoices?[:\s]*\$?([\d,]+\.?\d*)/i);
-        const payNone  = /total payments?[:\s]*none selected/i.test(bodyText);
-        const snippet  = (bodyText.match(/total invoices?.{0,220}/i) || [""])[0]
-          .replace(/\s+/g, " ").trim();
-        return {
-          invoiceTotal:        invMatch ? `$${invMatch[1]}` : "N/A",
-          paymentNoneSelected: payNone,
-          rawHeaderText:       snippet,
-        };
-      });
-
-      console.log(`    ℹ️  Header: "${headerTotals.rawHeaderText}"`);
-      console.log(`    ℹ️  Invoice total: ${headerTotals.invoiceTotal}`);
-      console.log(`    ℹ️  Total Payments: None Selected = ${headerTotals.paymentNoneSelected}`);
-      context.invoiceTotal = headerTotals.invoiceTotal;
-
-      if (headerTotals.paymentNoneSelected) {
-        console.log("    ✅ Perfect — invoices selected, Total Payments: None Selected");
-      } else {
-        console.log("    ⚠️  Payments not 'None Selected' — doing one final retry");
-        await clickTab(page, "Payments");
-        await page.waitForTimeout(2000);
-        await deselectAllOnCurrentTab(page);
-        await page.waitForTimeout(2000);
-        await clickTab(page, "Invoices");
-        await page.waitForTimeout(2000);
-        await page.evaluate(() => {
-          const cb = document.querySelector(
-            "thead input[type='checkbox'], th input[type='checkbox']"
-          ) as HTMLInputElement | null;
-          if (cb && !cb.checked) cb.click();
-        });
-        await page.waitForTimeout(2000);
-
-        const recheckNone = await page.evaluate(() =>
-          /total payments?[:\s]*none selected/i.test(document.body.textContent || "")
-        );
-        console.log(recheckNone
-          ? "    ✅ Confirmed: Total Payments: None Selected"
-          : "    ⚠️  Still not 'None Selected' — proceeding, modal is the final gate"
-        );
-      }
+      console.log(`    ✅ ${selectedCount} invoice(s) selected`);
+    }
+  }
+}
 
       // ------------------------------------------------------------------
       // STEP 8 — Click Send to QuickBooks
