@@ -356,8 +356,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       //   );
       // }
 
-
-    // ------------------------------------------------------------------
+     // ------------------------------------------------------------------
 // STEP 6 — Back to Invoices tab
 // ------------------------------------------------------------------
 console.log("\n[6] → Back to Invoices tab");
@@ -390,7 +389,7 @@ if (invoiceCount === 0 || invoiceNoneSelected) {
   try {
     await waitUntilVisible(page, "tbody tr", 10000);
     console.log("    ✅ Invoice rows are visible");
-  } catch {
+  } catch (err) {
     console.log("    ⚠️ No invoice rows visible — marking noInvoices = true");
     context.noInvoices = true;
     context.completionMessage = "No records found.";
@@ -400,9 +399,13 @@ if (invoiceCount === 0 || invoiceNoneSelected) {
     let selectedCount = 0;
     for (let attempt = 1; attempt <= 3; attempt++) {
       selectedCount = await page.evaluate(() => {
-        const cb = document.querySelector("thead input[type='checkbox'], th input[type='checkbox']") as HTMLInputElement | null;
+        const cb = document.querySelector(
+          "thead input[type='checkbox'], th input[type='checkbox']"
+        ) as HTMLInputElement | null;
         if (cb && !cb.checked) cb.click();
-        return Array.from(document.querySelectorAll('tbody input[type="checkbox"]:checked')).length;
+        return Array.from(
+          document.querySelectorAll('tbody input[type="checkbox"]:checked')
+        ).length;
       });
       console.log(`    Attempt ${attempt} → ${selectedCount} invoice(s) selected`);
       if (selectedCount > 0) break;
