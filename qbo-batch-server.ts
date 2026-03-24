@@ -278,17 +278,9 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     await page.waitForTimeout(3000);
 
     // ------------------------------------------------------------------
-    // NO INVOICES — bail early
+    // NO INVOICES — bail early (only based on tab label count)
     // ------------------------------------------------------------------
-    // Check header for "Total Invoices: None Selected" — means 0 invoices
-    const invoiceNoneSelected: boolean = await page.evaluate(() =>
-      /total invoices?[:\s]*none selected/i.test(document.body.textContent || "")
-    );
-    if (invoiceNoneSelected) {
-      console.log("    INFO: Header shows Total Invoices: None Selected");
-    }
-
-    if (invoiceCount === 0 || invoiceNoneSelected) {
+    if (invoiceCount === 0) {
       context.noInvoices = true;
       context.completionMessage = "No records found.";
       console.log("    ✅ No invoices to batch");
@@ -329,6 +321,15 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
       console.log(`    ℹ️  Total Payments: None Selected = ${headerTotals.paymentNoneSelected}`);
       context.invoiceTotal = headerTotals.invoiceTotal;
 
+      // If header shows "Total Invoices: None Selected" after selecting all,
+      // it means something went wrong — no invoices are actually selected
+      if (/none selected/i.test(headerTotals.invoiceTotal) || headerTotals.invoiceTotal === "N/A") {
+        context.noInvoices = true;
+        context.completionMessage = "No records found.";
+        console.log("    ✅ Header shows no invoices selected — returning No records found");
+        return;
+      }
+
       if (headerTotals.paymentNoneSelected) {
         console.log("    ✅ Perfect — invoices selected, Total Payments: None Selected");
       } else {
@@ -355,7 +356,6 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
           : "    ⚠️  Still not 'None Selected' — proceeding, modal is the final gate"
         );
       }
-
 
       // ------------------------------------------------------------------
       // STEP 8 — Click Send to QuickBooks
@@ -603,13 +603,7 @@ app.get("/job-status/:jobId", (req, res) => {
   }
 
   const response = { jobId: job.id, status: job.status, ...(job.result || {}), ...(job.error ? { error: job.error } : {}) };
-  // jobs.delete(job.id);
- // DELETE JOB AFTER 15 MINUTES
-  setTimeout(() => {
-    jobs.delete(job.id);
-    console.log(`🗑️ Job ${job.id} removed from memory after 15 min`);
-  }, 15 * 60 * 1000);
-  
+  jobs.delete(job.id);
   res.json(response);
 });
 
