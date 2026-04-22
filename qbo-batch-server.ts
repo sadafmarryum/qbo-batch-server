@@ -169,9 +169,18 @@ if (currentUrl.includes("/login")) {
     console.log("    → Switching to Payments tab URL");
     // await clickTab(page, "Payments");
     await page.goto("https://misterquik.sera.tech/accounting/unbatched?tab=ub_Payments");
-    await page.waitForTimeout(15000);
+    // await page.waitForTimeout(15000);
  
-    console.log("\n[3] → Deselecting all payments");
+    // console.log("\n[3] → Deselecting all payments");
+
+    // wait for page + React render
+await page.waitForLoadState?.("networkidle");
+await page.waitForTimeout(15000);
+
+// WAIT until payment table is actually visible
+await page.waitForSelector('tbody input[type="checkbox"]', {
+  timeout: 30000,
+});
     await deselectAllOnCurrentTab(page);
 
     const paymentsCleared = await waitUntilText(
