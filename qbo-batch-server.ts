@@ -222,6 +222,24 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     await page.goto(unbatchedUrl);
     await page.waitForTimeout(15000);
 
+   // ── If nothing to batch ──────────────────────────────────────
+   const nothingToBatch = await waitUntilText(
+   page,
+   /total invoices:\s*none selected/i,
+   5000
+  ).catch(() => false);
+
+  if (nothingToBatch) {
+  return {
+    success: false,
+    message: "No matching records found",
+    batchNumber: "N/A",
+    invoiceAmount: "0",
+    paymentAmount: "0",
+    sessionUrl,
+  };
+}
+    
     // =========================================================
     // PAYMENTS CLEANUP
     // =========================================================
