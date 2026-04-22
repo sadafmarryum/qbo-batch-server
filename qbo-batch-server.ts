@@ -328,68 +328,52 @@ if (currentUrl.includes("/login")) {
     //     paymentItems: paymentItems?.[1] || "0",
     //   };
     // });
-// -----------------New
-const modal = await page.evaluate(() => {
+
+    const modal = await page.evaluate(() => {
   const el = document.querySelector('.modal, [role="dialog"]');
   if (!el) return null;
 
-  const getText = (node: Element | null) =>
-    node?.textContent?.replace(/\s+/g, " ").trim() || "";
+  const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
 
-  // helper: find label element and grab nearby value
-  const findValueByLabel = (label: string) => {
-    const nodes = Array.from(el.querySelectorAll("*"));
+  const invoiceItemsMatch  = text.match(/Total Invoices\s*\((\d+)\)/i);
+  const invoiceAmountMatch = text.match(/Total Invoices[^$]*\$([\d,.]+)/i);
+  const paymentItemsMatch  = text.match(/Total Payments\s*\((\d+)\)/i);
+  const paymentAmountMatch = text.match(/Total Payments[^$]*\$([\d,.]+)/i);
 
-    const index = nodes.findIndex(n =>
-      n.textContent?.includes(label)
-    );
-
-    if (index === -1) return { amount: "0", items: "0" };
-
-    const labelNode = nodes[index];
-
-    // scan nearby nodes (UI is row-based)
-    const nearby = nodes.slice(index, index + 6)
-      .map(n => n.textContent?.trim() || "");
-
-    const amount = nearby.find(t => /\$\d/.test(t)) || "0";
-    const itemsMatch = nearby.find(t => /\(\d+\)/);
-
-    const items = itemsMatch?.match(/\((\d+)\)/)?.[1] || "0";
-
-    return {
-      amount: amount.replace(/[^\d.,$]/g, ""),
-      items
-    };
-  };
-
-  const invoice = findValueByLabel("Total Invoices");
-  const payment = findValueByLabel("Total Payments");
-
-  const batchNode = Array.from(el.querySelectorAll("*"))
-    .find(n => /batch/i.test(n.textContent || "") && /\d+/.test(n.textContent || ""));
-
-  const batchNumber =
-    batchNode?.textContent?.match(/(\d{3,})/)?.[1] || "";
+  const batchInput = el.querySelector('input[type="text"]') as HTMLInputElement | null;
+  const batchNumber = batchInput?.value?.match(/(\d+)/)?.[1] || "";
 
   return {
     batchNumber,
-    invoiceAmount: invoice.amount,
-    invoiceItems: invoice.items,
-    paymentAmount: payment.amount,
-    paymentItems: payment.items,
+    invoiceItems:  invoiceItemsMatch?.[1]  || "0",
+    invoiceAmount: invoiceAmountMatch?.[1] || "0",
+    paymentItems:  paymentItemsMatch?.[1]  || "0",
+    paymentAmount: paymentAmountMatch?.[1] || "0",
   };
 });
 
     if (!modal) {
   throw new Error("Modal not found — Send to QuickBooks dialog did not open");
 }
-    
-   // ---------- 
-    // HARD SAFETY CHECK
-    if (Number(modal.paymentItems) > 0) {
-      throw new Error("Payments found in batch — aborting");
-    }
+  console.log(`    → Modal parsed: items_inv=${modal.invoiceItems} amt_inv=${modal.invoiceAmount} items_pay=${modal.paymentItems} amt_pay=${modal.paymentAmount} batch=${modal.batchNumber}`);
+
+if (Number(modal.paymentItems) > 0) {
+  throw new Error("Payments found in batch — aborting");
+}
+
+    const createClicked = await page.evaluate(() => {
+  const btn = Array.from(
+    document.querySelectorAll('.modal button, [role="dialog"] button')
+  ).find(
+    (el) => el.textContent?.toLowerCase().includes("create batch") &&
+            (el as HTMLElement).offsetParent !== null
+  ) as HTMLElement | null;
+  if (btn) { btn.click(); return true; }
+  return false;
+});
+
+if (!createClicked) throw new Error('"Create Batch" button not found in modal');
+await page.waitForTimeout(5000);
 
     context.batchCreated = true;
     context.batchNumber = modal.batchNumber;
