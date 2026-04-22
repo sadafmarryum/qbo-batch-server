@@ -51,66 +51,6 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
   });
 }
 
-// async function deselectPaymentsOnly(page: any): Promise<number> {
-//   return await page.evaluate(() => {
-//     const paymentsSection =
-//       document.querySelector('[data-tab="ub_Payments"]') ||
-//       document.querySelector('[aria-label*="Payments"]') ||
-//       document.querySelector('.payments') ||
-//       document.body; // fallback
-
-//     const headerCb = paymentsSection.querySelector(
-//       'thead input[type="checkbox"], th input[type="checkbox"]'
-//     ) as HTMLInputElement | null;
-
-//     if (headerCb?.checked) {
-//       headerCb.click();
-//     }
-
-//     const checked = Array.from(
-//       paymentsSection.querySelectorAll('tbody input[type="checkbox"]:checked')
-//     ) as HTMLInputElement[];
-
-//     checked.forEach(cb => cb.click());
-
-//     return checked.length;
-//   });
-// }
-
-// async function deselectPaymentsOnly(page: any): Promise<number> {
-//   return await page.evaluate(() => {
-//     // find ONLY visible table (Payments tab renders one active grid)
-//     const tables = Array.from(document.querySelectorAll("table"));
-
-//     const visibleTable = tables.find(t => {
-//       const style = window.getComputedStyle(t);
-//       return style.display !== "none" && style.visibility !== "hidden";
-//     });
-
-//     if (!visibleTable) return 0;
-
-//     // header checkbox (select all in THIS table only)
-//     const headerCb = visibleTable.querySelector(
-//       'thead input[type="checkbox"], th input[type="checkbox"]'
-//     ) as HTMLInputElement | null;
-
-//     if (headerCb?.checked) {
-//       headerCb.click();
-//     }
-
-//     // row checkboxes ONLY in this table
-//     const checked = Array.from(
-//       visibleTable.querySelectorAll('tbody input[type="checkbox"]:checked')
-//     ) as HTMLInputElement[];
-
-//     checked.forEach(cb => cb.click());
-
-//     return checked.length;
-//   });
-// }
-
-
-
 async function deselectPaymentsOnly(page: any): Promise<number> {
  
   // ── Step 1: Wait for the Payments header <th> to appear ─────────────────
@@ -173,8 +113,6 @@ async function deselectPaymentsOnly(page: any): Promise<number> {
   return deselectedCount;
 }
  
-
-
 // async function clickTab(page: any, tab: "Invoices" | "Payments") {
 //   return await page.evaluate((name: string) => {
 //     const el = Array.from(
@@ -299,11 +237,6 @@ if (currentUrl.includes("/login")) {
     await page.waitForLoadState?.("networkidle");
     await page.waitForTimeout(20000);
 
-    // Wait until at least one checkbox is in the DOM
-    // await page.waitForSelector('tbody input[type="checkbox"]', {
-    //   timeout: 30000,
-    // });
-
     console.log("    → Deselecting all payments");
     // await deselectAllOnCurrentTab(page);
     await deselectPaymentsOnly(page);
@@ -332,43 +265,43 @@ if (currentUrl.includes("/login")) {
     // =========================================================
 // TEST STOP HERE (SAFE DEBUG MODE)
 // =========================================================
-context.batchCreated = true;
+// context.batchCreated = true;
 
-context.completionMessage = `
-✅ TEST SUCCESS
+// context.completionMessage = `
+// ✅ TEST SUCCESS
 
-Invoices tab opened successfully.
-No selection / QBO action executed.
+// Invoices tab opened successfully.
+// No selection / QBO action executed.
 
-You can verify UI state from session URL.
-`;
+// You can verify UI state from session URL.
+// `;
 
-await page.waitForTimeout(2000);
+// await page.waitForTimeout(2000);
 
     
     // =========================================================
     // SEND TO QUICKBOOKS (YOUR EXACT LOGIC)
     // =========================================================
-    // console.log("\n[8] → Clicking Send to QuickBooks");
+    console.log("\n[8] → Clicking Send to QuickBooks");
 
-    // const qbClicked = await page.evaluate(() => {
-    //   const el = Array.from(document.querySelectorAll("button, a")).find(
-    //     (e) =>
-    //       (e.textContent?.toLowerCase().includes("send to quickbooks") ||
-    //         e.textContent?.toLowerCase().includes("quickbooks")) &&
-    //       (e as HTMLElement).offsetParent !== null
-    //   ) as HTMLElement | null;
+    const qbClicked = await page.evaluate(() => {
+      const el = Array.from(document.querySelectorAll("button, a")).find(
+        (e) =>
+          (e.textContent?.toLowerCase().includes("send to quickbooks") ||
+            e.textContent?.toLowerCase().includes("quickbooks")) &&
+          (e as HTMLElement).offsetParent !== null
+      ) as HTMLElement | null;
 
-    //   if (el) {
-    //     el.click();
-    //     return true;
-    //   }
-    //   return false;
-    // });
+      if (el) {
+        el.click();
+        return true;
+      }
+      return false;
+    });
 
-    // if (!qbClicked) throw new Error('"Send to QuickBooks" button not found');
+    if (!qbClicked) throw new Error('"Send to QuickBooks" button not found');
 
-    // await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000);
 
     // =========================================================
     // READ MODAL
@@ -396,83 +329,83 @@ await page.waitForTimeout(2000);
     //   };
     // });
 // -----------------New
-// const modal = await page.evaluate(() => {
-//   const el = document.querySelector('.modal, [role="dialog"]');
-//   if (!el) return null;
+const modal = await page.evaluate(() => {
+  const el = document.querySelector('.modal, [role="dialog"]');
+  if (!el) return null;
 
-//   const getText = (node: Element | null) =>
-//     node?.textContent?.replace(/\s+/g, " ").trim() || "";
+  const getText = (node: Element | null) =>
+    node?.textContent?.replace(/\s+/g, " ").trim() || "";
 
-//   // helper: find label element and grab nearby value
-//   const findValueByLabel = (label: string) => {
-//     const nodes = Array.from(el.querySelectorAll("*"));
+  // helper: find label element and grab nearby value
+  const findValueByLabel = (label: string) => {
+    const nodes = Array.from(el.querySelectorAll("*"));
 
-//     const index = nodes.findIndex(n =>
-//       n.textContent?.includes(label)
-//     );
+    const index = nodes.findIndex(n =>
+      n.textContent?.includes(label)
+    );
 
-//     if (index === -1) return { amount: "0", items: "0" };
+    if (index === -1) return { amount: "0", items: "0" };
 
-//     const labelNode = nodes[index];
+    const labelNode = nodes[index];
 
-//     // scan nearby nodes (UI is row-based)
-//     const nearby = nodes.slice(index, index + 6)
-//       .map(n => n.textContent?.trim() || "");
+    // scan nearby nodes (UI is row-based)
+    const nearby = nodes.slice(index, index + 6)
+      .map(n => n.textContent?.trim() || "");
 
-//     const amount = nearby.find(t => /\$\d/.test(t)) || "0";
-//     const itemsMatch = nearby.find(t => /\(\d+\)/);
+    const amount = nearby.find(t => /\$\d/.test(t)) || "0";
+    const itemsMatch = nearby.find(t => /\(\d+\)/);
 
-//     const items = itemsMatch?.match(/\((\d+)\)/)?.[1] || "0";
+    const items = itemsMatch?.match(/\((\d+)\)/)?.[1] || "0";
 
-//     return {
-//       amount: amount.replace(/[^\d.,$]/g, ""),
-//       items
-//     };
-//   };
+    return {
+      amount: amount.replace(/[^\d.,$]/g, ""),
+      items
+    };
+  };
 
-//   const invoice = findValueByLabel("Total Invoices");
-//   const payment = findValueByLabel("Total Payments");
+  const invoice = findValueByLabel("Total Invoices");
+  const payment = findValueByLabel("Total Payments");
 
-//   const batchNode = Array.from(el.querySelectorAll("*"))
-//     .find(n => /batch/i.test(n.textContent || "") && /\d+/.test(n.textContent || ""));
+  const batchNode = Array.from(el.querySelectorAll("*"))
+    .find(n => /batch/i.test(n.textContent || "") && /\d+/.test(n.textContent || ""));
 
-//   const batchNumber =
-//     batchNode?.textContent?.match(/(\d{3,})/)?.[1] || "";
+  const batchNumber =
+    batchNode?.textContent?.match(/(\d{3,})/)?.[1] || "";
 
-//   return {
-//     batchNumber,
-//     invoiceAmount: invoice.amount,
-//     invoiceItems: invoice.items,
-//     paymentAmount: payment.amount,
-//     paymentItems: payment.items,
-//   };
-// });
+  return {
+    batchNumber,
+    invoiceAmount: invoice.amount,
+    invoiceItems: invoice.items,
+    paymentAmount: payment.amount,
+    paymentItems: payment.items,
+  };
+});
 
     
-//    // ---------- 
-//     // HARD SAFETY CHECK
-//     if (Number(modal.paymentItems) > 0) {
-//       throw new Error("Payments found in batch — aborting");
-//     }
+   // ---------- 
+    // HARD SAFETY CHECK
+    if (Number(modal.paymentItems) > 0) {
+      throw new Error("Payments found in batch — aborting");
+    }
 
-//     context.batchCreated = true;
-//     context.batchNumber = modal.batchNumber;
-//     context.invoiceAmount = modal.invoiceAmount;
-//     context.paymentAmount = modal.paymentAmount;
+    context.batchCreated = true;
+    context.batchNumber = modal.batchNumber;
+    context.invoiceAmount = modal.invoiceAmount;
+    context.paymentAmount = modal.paymentAmount;
 
-//     // =========================================================
-//     // FINAL MESSAGE (UPDATED)
-//     // =========================================================
-//     context.completionMessage = `
-// Batch Created Successfully
-// - Batch #: ${modal.batchNumber}
-// - Invoice Items: ${modal.invoiceItems}
-// - Invoice Amount: $${modal.invoiceAmount}
-// - Payment Items: ${modal.paymentItems}
-// - Payment Amount: $${modal.paymentAmount}
-// `;
+    // =========================================================
+    // FINAL MESSAGE (UPDATED)
+    // =========================================================
+    context.completionMessage = `
+Batch Created Successfully
+- Batch #: ${modal.batchNumber}
+- Invoice Items: ${modal.invoiceItems}
+- Invoice Amount: $${modal.invoiceAmount}
+- Payment Items: ${modal.paymentItems}
+- Payment Amount: $${modal.paymentAmount}
+`;
 
-//     await page.waitForTimeout(5000);
+    await page.waitForTimeout(5000);
 
   } catch (err: any) {
     context.error = err.message;
