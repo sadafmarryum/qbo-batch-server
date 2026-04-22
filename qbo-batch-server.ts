@@ -112,65 +112,67 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
 
 
 async function deselectPaymentsOnly(page: any): Promise<number> {
-
-  // ── Step 1: Wait for the Payments header <th> to appear in DOM ──────────
+ 
+  // ── Step 1: Wait for the Payments header <th> to appear ─────────────────
+  console.log("    → Waiting for payment table header...");
   await page.waitForSelector("th.payment_exports_report_header_null", {
-    timeout: 30000,
+    timeout: 60000,
   });
-
-  // ── Step 2: Resolve the parent <table> of the Payments header <th> ──────
-  const paymentsTable = page
-    .locator("th.payment_exports_report_header_null")
-    .locator("xpath=ancestor::table[1]");
-
-  if ((await paymentsTable.count()) === 0) {
-    throw new Error(
-      "Could not locate Payments table via th.payment_exports_report_header_null"
+  console.log("    ✅ Payment table header found");
+ 
+  // ── Step 2: Deselect via page.evaluate — scoped to Payments table only ──
+  // page.evaluate runs in the browser context where normal DOM APIs work.
+  // We find the <th> unique to Payments, walk up to its <table>, then
+  // click only the checked custom-checkboxes inside that table.
+  const deselectedCount: number = await page.evaluate(() => {
+    // Find the <th> that only exists in the Payments table
+    const paymentHeader = document.querySelector(
+      "th.payment_exports_report_header_null"
     );
-  }
-
-  console.log(
-    "    ✅ Payments table located via th.payment_exports_report_header_null"
-  );
-
-  // ── Step 3: Try the header checkbox first (clears ALL rows at once) ──────
-  //   Checkbox lives inside th.payment_exports_report_header_null
-  //   with class="custom-checkbox" (from your inspect element)
-  const headerCheckbox = page
-    .locator("th.payment_exports_report_header_null input.custom-checkbox")
-    .first();
-
-  if (
-    (await headerCheckbox.count()) > 0 &&
-    !(await headerCheckbox.isDisabled()) &&
-    (await headerCheckbox.isChecked())
-  ) {
-    await headerCheckbox.click();
+    if (!paymentHeader) {
+      throw new Error("payment_exports_report_header_null th not found in DOM");
+    }
+ 
+    // Walk up to the parent <table>
+    const table = paymentHeader.closest("table");
+    if (!table) {
+      throw new Error("Could not find parent <table> of payment header th");
+    }
+ 
+    // Try header checkbox first (clears all rows at once)
+    const headerCb = paymentHeader.querySelector(
+      "input.custom-checkbox"
+    ) as HTMLInputElement | null;
+ 
+    if (headerCb && !headerCb.disabled && headerCb.checked) {
+      headerCb.click();
+      return -1; // sentinel: header was clicked
+    }
+ 
+    // Deselect all checked row checkboxes scoped strictly to this table
+    const checkedBoxes = Array.from(
+      table.querySelectorAll("tbody input.custom-checkbox:checked")
+    ) as HTMLInputElement[];
+ 
+    checkedBoxes.forEach(cb => cb.click());
+    return checkedBoxes.length;
+  });
+ 
+  if (deselectedCount === -1) {
+    console.log("    ✅ Header checkbox clicked — all payment rows cleared");
     await page.waitForTimeout(500);
-    console.log("    ✅ Header checkbox deselected — all payment rows cleared");
     return 1;
   }
-
-  // ── Step 4: Deselect individual checked rows scoped to Payments table ────
-  //   Re-query on every iteration so Vue reactivity never gives stale handles
-  let deselectedCount = 0;
-
-  while (true) {
-    const checked = paymentsTable
-      .locator("tbody input.custom-checkbox:checked")
-      .first();
-
-    if ((await checked.count()) === 0) break;
-
-    await checked.click();
-    await page.waitForTimeout(150); // let Vue reactivity settle
-    deselectedCount++;
+ 
+  // If rows were individually deselected, allow Vue to settle
+  if (deselectedCount > 0) {
+    await page.waitForTimeout(deselectedCount * 150);
   }
-
+ 
   console.log(`    ✅ Deselected ${deselectedCount} payment row checkbox(es)`);
   return deselectedCount;
 }
-
+ 
 
 
 // async function clickTab(page: any, tab: "Invoices" | "Payments") {
