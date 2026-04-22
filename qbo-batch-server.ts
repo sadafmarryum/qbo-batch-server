@@ -306,7 +306,7 @@ if (currentUrl.includes("/login")) {
     // =========================================================
     // READ MODAL
     // =========================================================
-    // await waitUntilVisible(page, '.modal, [role="dialog"]');
+    await waitUntilVisible(page, '.modal, [role="dialog"]');
 
     // const modal = await page.evaluate(() => {
     //   const el = document.querySelector('.modal, [role="dialog"]');
