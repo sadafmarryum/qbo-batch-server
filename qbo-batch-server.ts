@@ -231,7 +231,7 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
 
   if (nothingToBatch) {
   return {
-    success: false,
+    success: true,
     message: "No matching records found",
     batchNumber: "N/A",
     invoiceAmount: "0",
