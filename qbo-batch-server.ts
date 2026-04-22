@@ -51,22 +51,22 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
   });
 }
 
-async function clickTab(page: any, tab: "Invoices" | "Payments") {
-  return await page.evaluate((name: string) => {
-    const el = Array.from(
-      document.querySelectorAll("a, button, [role='tab'], li, span")
-    ).find(e =>
-      new RegExp(name, "i").test(e.textContent || "") &&
-      (e as HTMLElement).offsetParent !== null
-    ) as HTMLElement | null;
+// async function clickTab(page: any, tab: "Invoices" | "Payments") {
+//   return await page.evaluate((name: string) => {
+//     const el = Array.from(
+//       document.querySelectorAll("a, button, [role='tab'], li, span")
+//     ).find(e =>
+//       new RegExp(name, "i").test(e.textContent || "") &&
+//       (e as HTMLElement).offsetParent !== null
+//     ) as HTMLElement | null;
 
-    if (el) {
-      el.click();
-      return true;
-    }
-    return false;
-  }, tab);
-}
+//     if (el) {
+//       el.click();
+//       return true;
+//     }
+//     return false;
+//   }, tab);
+// }
 
 // =============================================================================
 // MAIN TASK
@@ -159,15 +159,19 @@ if (currentUrl.includes("/login")) {
     // =========================================================
     // OPEN UNBATCHED
     // =========================================================
+    console.log("\n[2] → Opening unbatched base page");
     await page.goto(unbatchedUrl);
     await page.waitForTimeout(15000);
 
     // =========================================================
     // PAYMENTS CLEANUP
     // =========================================================
-    await clickTab(page, "Payments");
-    await page.waitForTimeout(5 * 60 * 1000);
-
+    console.log("    → Switching to Payments tab URL");
+    // await clickTab(page, "Payments");
+    await page.goto("https://misterquik.sera.tech/accounting/unbatched?tab=ub_Payments");
+    await page.waitForTimeout(15000);
+ 
+    console.log("\n[3] → Deselecting all payments");
     await deselectAllOnCurrentTab(page);
 
     const paymentsCleared = await waitUntilText(
@@ -187,8 +191,8 @@ if (currentUrl.includes("/login")) {
     // =========================================================
     // INVOICES TAB (NO SELECTION)
     // =========================================================
-    await clickTab(page, "Invoices");
-    await page.waitForTimeout(3000);
+    // await clickTab(page, "Invoices");
+    // await page.waitForTimeout(3000);
 
 
     // =========================================================
