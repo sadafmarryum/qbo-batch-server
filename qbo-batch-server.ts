@@ -60,11 +60,8 @@ async function deselectPaymentsOnly(page: any): Promise<number> {
   });
   console.log("    ✅ Payment table header found");
  
-  // ── Step 2: Deselect via page.evaluate — scoped to Payments table only ──
-  // page.evaluate runs in the browser context where normal DOM APIs work.
-  // We find the <th> unique to Payments, walk up to its <table>, then
-  // click only the checked custom-checkboxes inside that table.
-  const deselectedCount: number = await page.evaluate(() => {
+   // ── Step 2: Deselect via page.evaluate — scoped to Payments table only ──
+    const deselectedCount: number = await page.evaluate(() => {
     // Find the <th> that only exists in the Payments table
     const paymentHeader = document.querySelector(
       "th.payment_exports_report_header_null"
@@ -163,22 +160,22 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     // =========================================================
     // LOGIN
     // =========================================================
-console.log("\n[1] → Navigating to login page");
+    console.log("\n[1] → Navigating to login page");
 
-await page.goto("https://misterquik.sera.tech/admins/login");
-await page.waitForTimeout(3000);
+    await page.goto("https://misterquik.sera.tech/admins/login");
+    await page.waitForTimeout(3000);
 
-const currentUrl: string = await page.url();
+    const currentUrl: string = await page.url();
 
-if (currentUrl.includes("/login")) {
-  console.log("    → Filling credentials");
+    if (currentUrl.includes("/login")) {
+    console.log("    → Filling credentials");
 
-  await page.locator('input[type="email"]').first().fill(email);
-  await page.locator('input[type="password"]').first().fill(password);
+    await page.locator('input[type="email"]').first().fill(email);
+    await page.locator('input[type="password"]').first().fill(password);
 
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
 
-  const clicked = await page.evaluate(() => {
+    const clicked = await page.evaluate(() => {
     const btn = Array.from(
       document.querySelectorAll('button, input[type="submit"]')
     ).find(
@@ -261,24 +258,6 @@ if (currentUrl.includes("/login")) {
     // await clickTab(page, "Invoices");
     // await page.waitForTimeout(3000);
 
-
-    // =========================================================
-// TEST STOP HERE (SAFE DEBUG MODE)
-// =========================================================
-// context.batchCreated = true;
-
-// context.completionMessage = `
-// ✅ TEST SUCCESS
-
-// Invoices tab opened successfully.
-// No selection / QBO action executed.
-
-// You can verify UI state from session URL.
-// `;
-
-// await page.waitForTimeout(2000);
-
-    
     // =========================================================
     // SEND TO QUICKBOOKS (YOUR EXACT LOGIC)
     // =========================================================
@@ -308,72 +287,51 @@ if (currentUrl.includes("/login")) {
     // =========================================================
     await waitUntilVisible(page, '.modal, [role="dialog"]');
 
-    // const modal = await page.evaluate(() => {
-    //   const el = document.querySelector('.modal, [role="dialog"]');
-    //   const text = el?.textContent || "";
-
-    //   const invoiceMatch = text.match(/invoices?.*?\$([\d,.]+)/i);
-    //   const invoiceItems = text.match(/invoices?.*?(\d+)\s*items/i);
-
-    //   const paymentMatch = text.match(/payments?.*?\$([\d,.]+)/i);
-    //   const paymentItems = text.match(/payments?.*?(\d+)\s*items/i);
-
-    //   const batch = text.match(/batch\s*#?\s*(\d+)/i);
-
-    //   return {
-    //     batchNumber: batch?.[1] || "",
-    //     invoiceAmount: invoiceMatch?.[1] || "0",
-    //     invoiceItems: invoiceItems?.[1] || "0",
-    //     paymentAmount: paymentMatch?.[1] || "0",
-    //     paymentItems: paymentItems?.[1] || "0",
-    //   };
-    // });
-
     const modal = await page.evaluate(() => {
-  const el = document.querySelector('.modal, [role="dialog"]');
-  if (!el) return null;
+    const el = document.querySelector('.modal, [role="dialog"]');
+    if (!el) return null;
 
-  const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
+    const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
 
-  const invoiceItemsMatch  = text.match(/Total Invoices\s*\((\d+)\)/i);
-  const invoiceAmountMatch = text.match(/Total Invoices[^$]*\$([\d,.]+)/i);
-  const paymentItemsMatch  = text.match(/Total Payments\s*\((\d+)\)/i);
-  const paymentAmountMatch = text.match(/Total Payments[^$]*\$([\d,.]+)/i);
+    const invoiceItemsMatch  = text.match(/Total Invoices\s*\((\d+)\)/i);
+    const invoiceAmountMatch = text.match(/Total Invoices[^$]*\$([\d,.]+)/i);
+    const paymentItemsMatch  = text.match(/Total Payments\s*\((\d+)\)/i);
+    const paymentAmountMatch = text.match(/Total Payments[^$]*\$([\d,.]+)/i);
 
-  const batchInput = el.querySelector('input[type="text"]') as HTMLInputElement | null;
-  const batchNumber = batchInput?.value?.match(/(\d+)/)?.[1] || "";
+    const batchInput = el.querySelector('input[type="text"]') as HTMLInputElement | null;
+    const batchNumber = batchInput?.value?.trim() || "";
 
-  return {
+    return {
     batchNumber,
     invoiceItems:  invoiceItemsMatch?.[1]  || "0",
     invoiceAmount: invoiceAmountMatch?.[1] || "0",
     paymentItems:  paymentItemsMatch?.[1]  || "0",
     paymentAmount: paymentAmountMatch?.[1] || "0",
-  };
-});
+    };
+   });
 
     if (!modal) {
-  throw new Error("Modal not found — Send to QuickBooks dialog did not open");
-}
-  console.log(`    → Modal parsed: items_inv=${modal.invoiceItems} amt_inv=${modal.invoiceAmount} items_pay=${modal.paymentItems} amt_pay=${modal.paymentAmount} batch=${modal.batchNumber}`);
+    throw new Error("Modal not found — Send to QuickBooks dialog did not open");
+   }
+   console.log(`    → Modal parsed: items_inv=${modal.invoiceItems} amt_inv=${modal.invoiceAmount} items_pay=${modal.paymentItems} amt_pay=${modal.paymentAmount} batch=${modal.batchNumber}`);
 
-if (Number(modal.paymentItems) > 0) {
-  throw new Error("Payments found in batch — aborting");
-}
+   if (Number(modal.paymentItems) > 0) {
+   throw new Error("Payments found in batch — aborting");
+   }
 
     const createClicked = await page.evaluate(() => {
-  const btn = Array.from(
+    const btn = Array.from(
     document.querySelectorAll('.modal button, [role="dialog"] button')
-  ).find(
+    ).find(
     (el) => el.textContent?.toLowerCase().includes("create batch") &&
             (el as HTMLElement).offsetParent !== null
-  ) as HTMLElement | null;
-  if (btn) { btn.click(); return true; }
-  return false;
-});
+    ) as HTMLElement | null;
+    if (btn) { btn.click(); return true; }
+    return false;
+    });
 
-if (!createClicked) throw new Error('"Create Batch" button not found in modal');
-await page.waitForTimeout(5000);
+    if (!createClicked) throw new Error('"Create Batch" button not found in modal');
+    await page.waitForTimeout(5000);
 
     context.batchCreated = true;
     context.batchNumber = modal.batchNumber;
@@ -384,13 +342,13 @@ await page.waitForTimeout(5000);
     // FINAL MESSAGE (UPDATED)
     // =========================================================
     context.completionMessage = `
-Batch Created Successfully
-- Batch #: ${modal.batchNumber}
-- Invoice Items: ${modal.invoiceItems}
-- Invoice Amount: $${modal.invoiceAmount}
-- Payment Items: ${modal.paymentItems}
-- Payment Amount: $${modal.paymentAmount}
-`;
+    Batch Created Successfully
+    - Batch #: ${modal.batchNumber}
+    - Invoice Items: ${modal.invoiceItems}
+    - Invoice Amount: $${modal.invoiceAmount}
+    - Payment Items: ${modal.paymentItems}
+    - Payment Amount: $${modal.paymentAmount}
+    `;
 
     await page.waitForTimeout(5000);
 
