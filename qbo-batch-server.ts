@@ -253,7 +253,7 @@ if (currentUrl.includes("/login")) {
 
     context.paymentsCleared = true;
 
-    await page.waitForTimeout(2 * 60 * 1000);
+    await page.waitForTimeout(10000);
 
     // =========================================================
     // INVOICES TAB (NO SELECTION)
