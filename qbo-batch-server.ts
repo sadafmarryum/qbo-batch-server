@@ -381,6 +381,9 @@ const modal = await page.evaluate(() => {
   };
 });
 
+    if (!modal) {
+  throw new Error("Modal not found — Send to QuickBooks dialog did not open");
+}
     
    // ---------- 
     // HARD SAFETY CHECK
