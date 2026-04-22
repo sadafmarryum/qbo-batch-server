@@ -77,36 +77,141 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
 //   });
 // }
 
+// async function deselectPaymentsOnly(page: any): Promise<number> {
+//   return await page.evaluate(() => {
+//     // find ONLY visible table (Payments tab renders one active grid)
+//     const tables = Array.from(document.querySelectorAll("table"));
+
+//     const visibleTable = tables.find(t => {
+//       const style = window.getComputedStyle(t);
+//       return style.display !== "none" && style.visibility !== "hidden";
+//     });
+
+//     if (!visibleTable) return 0;
+
+//     // header checkbox (select all in THIS table only)
+//     const headerCb = visibleTable.querySelector(
+//       'thead input[type="checkbox"], th input[type="checkbox"]'
+//     ) as HTMLInputElement | null;
+
+//     if (headerCb?.checked) {
+//       headerCb.click();
+//     }
+
+//     // row checkboxes ONLY in this table
+//     const checked = Array.from(
+//       visibleTable.querySelectorAll('tbody input[type="checkbox"]:checked')
+//     ) as HTMLInputElement[];
+
+//     checked.forEach(cb => cb.click());
+
+//     return checked.length;
+//   });
+// }
+
+
+
 async function deselectPaymentsOnly(page: any): Promise<number> {
-  return await page.evaluate(() => {
-    // find ONLY visible table (Payments tab renders one active grid)
-    const tables = Array.from(document.querySelectorAll("table"));
 
-    const visibleTable = tables.find(t => {
-      const style = window.getComputedStyle(t);
-      return style.display !== "none" && style.visibility !== "hidden";
-    });
+  // ── Step 1: Confirm the Payments tab is actually active ──────────────────
+  const activeTab = page.locator('[data-cy="tab-Payments"] .nav-link.active');
+  if ((await activeTab.count()) === 0) {
+    throw new Error(
+      "Payments tab is not active — cannot safely scope deselection"
+    );
+  }
 
-    if (!visibleTable) return 0;
+  // ── Step 2: Locate the Payments panel container ──────────────────────────
+  // data-cy naming conventions vary per app; try most-likely patterns first.
+  const panelCandidates = [
+    '[data-cy="panel-Payments"]',
+    '[data-cy="tabpanel-Payments"]',
+    '[data-cy="content-Payments"]',
+    '[data-cy="tab-Payments"] ~ div',   // immediate sibling of tab container
+    '[data-cy="tab-Payments"] + div',
+  ];
 
-    // header checkbox (select all in THIS table only)
-    const headerCb = visibleTable.querySelector(
-      'thead input[type="checkbox"], th input[type="checkbox"]'
-    ) as HTMLInputElement | null;
+  let panel: any = null;
 
-    if (headerCb?.checked) {
-      headerCb.click();
+  for (const sel of panelCandidates) {
+    const loc = page.locator(sel);
+    if ((await loc.count()) > 0 && (await loc.first().isVisible())) {
+      panel = loc.first();
+      console.log(`    ✅ Payments panel found via: ${sel}`);
+      break;
     }
+  }
 
-    // row checkboxes ONLY in this table
-    const checked = Array.from(
-      visibleTable.querySelectorAll('tbody input[type="checkbox"]:checked')
-    ) as HTMLInputElement[];
+  // ── Step 3: Fallback — climb up from the active nav-link and find table ──
+  if (!panel) {
+    console.log(
+      "    ⚠️  No data-cy panel found — using nav-link.active parent strategy"
+    );
 
-    checked.forEach(cb => cb.click());
+    // [data-cy="tab-Payments"] → parent → descendant table
+    panel = page
+      .locator('[data-cy="tab-Payments"]')
+      .locator("..")       // one level up from tab group
+      .locator(">> table") // first visible table descendant
+      .first();
+  }
 
-    return checked.length;
-  });
+  if (!panel || (await panel.count()) === 0) {
+    // ── DOM Diagnostic before throwing ──────────────────────────────────────
+    const debug = await page.evaluate(() => {
+      const tab = document.querySelector('[data-cy="tab-Payments"]');
+      if (!tab) return "data-cy=tab-Payments not found in DOM";
+
+      const parent = tab.parentElement;
+      return {
+        tabOuterHTML: tab.outerHTML.slice(0, 300),
+        parentTag: parent?.tagName,
+        parentId: parent?.id,
+        parentDataCy: parent?.getAttribute("data-cy"),
+        siblings: Array.from(parent?.children || []).map(el => ({
+          tag: el.tagName,
+          id: (el as HTMLElement).id,
+          dataCy: el.getAttribute("data-cy"),
+          class: el.className.slice(0, 80),
+        })),
+      };
+    });
+    console.error("DOM diagnostic:", JSON.stringify(debug, null, 2));
+    throw new Error(
+      "Could not locate Payments panel — check DOM diagnostic output above"
+    );
+  }
+
+  // ── Step 4: Deselect header checkbox first (clears all rows at once) ─────
+  const headerCb = panel
+    .locator('thead input[type="checkbox"], th input[type="checkbox"]')
+    .first();
+
+  if ((await headerCb.count()) > 0 && (await headerCb.isChecked())) {
+    await headerCb.click();
+    await page.waitForTimeout(500); // let Vue reactivity settle
+    console.log("    ✅ Header checkbox deselected — all payments cleared");
+    return 1;
+  }
+
+  // ── Step 5: Deselect individual checked rows (re-query each time) ─────────
+  // Re-querying prevents stale handles after Vue re-renders the list.
+  let deselectedCount = 0;
+
+  while (true) {
+    const checked = panel
+      .locator('tbody input[type="checkbox"]:checked')
+      .first();
+
+    if ((await checked.count()) === 0) break;
+
+    await checked.click();
+    await page.waitForTimeout(150);
+    deselectedCount++;
+  }
+
+  console.log(`    ✅ Deselected ${deselectedCount} payment row(s)`);
+  return deselectedCount;
 }
 
 
@@ -225,21 +330,21 @@ if (currentUrl.includes("/login")) {
     // =========================================================
     // PAYMENTS CLEANUP
     // =========================================================
-    console.log("    → Switching to Payments tab URL");
-    // await clickTab(page, "Payments");
-    await page.goto("https://misterquik.sera.tech/accounting/unbatched?tab=ub_Payments");
-    // await page.waitForTimeout(15000);
- 
-    // console.log("\n[3] → Deselecting all payments");
+       console.log("\n[3] → Switching to Payments tab");
+    await page.goto(
+      "https://misterquik.sera.tech/accounting/unbatched?tab=ub_Payments"
+    );
 
-    // wait for page + React render
-await page.waitForLoadState?.("networkidle");
-await page.waitForTimeout(15000);
+    // Wait for full page + Vue render
+    await page.waitForLoadState?.("networkidle");
+    await page.waitForTimeout(15000);
 
-// WAIT until payment table is actually visible
-await page.waitForSelector('tbody input[type="checkbox"]', {
-  timeout: 30000,
-});
+    // Wait until at least one checkbox is in the DOM
+    await page.waitForSelector('tbody input[type="checkbox"]', {
+      timeout: 30000,
+    });
+
+    console.log("    → Deselecting all payments");
     // await deselectAllOnCurrentTab(page);
     await deselectPaymentsOnly(page);
 
