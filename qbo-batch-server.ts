@@ -295,12 +295,12 @@ if (currentUrl.includes("/login")) {
 
     // Wait for full page + Vue render
     await page.waitForLoadState?.("networkidle");
-    await page.waitForTimeout(15000);
+    await page.waitForTimeout(20000);
 
     // Wait until at least one checkbox is in the DOM
-    await page.waitForSelector('tbody input[type="checkbox"]', {
-      timeout: 30000,
-    });
+    // await page.waitForSelector('tbody input[type="checkbox"]', {
+    //   timeout: 30000,
+    // });
 
     console.log("    → Deselecting all payments");
     // await deselectAllOnCurrentTab(page);
