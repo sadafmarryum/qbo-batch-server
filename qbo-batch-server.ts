@@ -51,6 +51,65 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
   });
 }
 
+// async function deselectPaymentsOnly(page: any): Promise<number> {
+//   return await page.evaluate(() => {
+//     const paymentsSection =
+//       document.querySelector('[data-tab="ub_Payments"]') ||
+//       document.querySelector('[aria-label*="Payments"]') ||
+//       document.querySelector('.payments') ||
+//       document.body; // fallback
+
+//     const headerCb = paymentsSection.querySelector(
+//       'thead input[type="checkbox"], th input[type="checkbox"]'
+//     ) as HTMLInputElement | null;
+
+//     if (headerCb?.checked) {
+//       headerCb.click();
+//     }
+
+//     const checked = Array.from(
+//       paymentsSection.querySelectorAll('tbody input[type="checkbox"]:checked')
+//     ) as HTMLInputElement[];
+
+//     checked.forEach(cb => cb.click());
+
+//     return checked.length;
+//   });
+// }
+
+async function deselectPaymentsOnly(page: any): Promise<number> {
+  return await page.evaluate(() => {
+    // find ONLY visible table (Payments tab renders one active grid)
+    const tables = Array.from(document.querySelectorAll("table"));
+
+    const visibleTable = tables.find(t => {
+      const style = window.getComputedStyle(t);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+
+    if (!visibleTable) return 0;
+
+    // header checkbox (select all in THIS table only)
+    const headerCb = visibleTable.querySelector(
+      'thead input[type="checkbox"], th input[type="checkbox"]'
+    ) as HTMLInputElement | null;
+
+    if (headerCb?.checked) {
+      headerCb.click();
+    }
+
+    // row checkboxes ONLY in this table
+    const checked = Array.from(
+      visibleTable.querySelectorAll('tbody input[type="checkbox"]:checked')
+    ) as HTMLInputElement[];
+
+    checked.forEach(cb => cb.click());
+
+    return checked.length;
+  });
+}
+
+
 // async function clickTab(page: any, tab: "Invoices" | "Payments") {
 //   return await page.evaluate((name: string) => {
 //     const el = Array.from(
@@ -181,7 +240,8 @@ await page.waitForTimeout(15000);
 await page.waitForSelector('tbody input[type="checkbox"]', {
   timeout: 30000,
 });
-    await deselectAllOnCurrentTab(page);
+    // await deselectAllOnCurrentTab(page);
+    await deselectPaymentsOnly(page);
 
     const paymentsCleared = await waitUntilText(
       page,
