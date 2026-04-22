@@ -298,8 +298,8 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     const paymentItemsMatch  = text.match(/Total Payments\s*\((\d+)\)/i);
     const paymentAmountMatch = text.match(/Total Payments[^$]*\$([\d,.]+)/i);
 
-    const batchInput = el.querySelector('input[type="text"]') as HTMLInputElement | null;
-    const batchNumber = batchInput?.value?.trim() || "";
+    const batchInput = el.querySelector('[data-cy="batch-name"]') as HTMLInputElement | null;
+    const batchNumber = batchInput?.value?.trim() || "";  
 
     return {
     batchNumber,
