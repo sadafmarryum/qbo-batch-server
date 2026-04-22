@@ -101,20 +101,60 @@ async function runQBOBatchTask(options: { testInvoiceUrl?: string } = {}) {
     // =========================================================
     // LOGIN
     // =========================================================
-    await page.goto("https://misterquik.sera.tech/admins/login");
+console.log("\n[1] → Navigating to login page");
 
-    if ((await page.url()).includes("login")) {
-      await page.locator('input[type="email"]').fill(email);
-      await page.locator('input[type="password"]').fill(password);
+await page.goto("https://misterquik.sera.tech/admins/login");
+await page.waitForTimeout(3000);
 
-      await page.evaluate(() => {
-        const btn = Array.from(document.querySelectorAll("button"))
-          .find(b => /login|sign in/i.test(b.textContent || ""));
-        (btn as HTMLElement)?.click();
-      });
+const currentUrl: string = await page.url();
 
-      await page.waitForTimeout(8000);
+if (currentUrl.includes("/login")) {
+  console.log("    → Filling credentials");
+
+  await page.locator('input[type="email"]').first().fill(email);
+  await page.locator('input[type="password"]').first().fill(password);
+
+  await page.waitForTimeout(500);
+
+  const clicked = await page.evaluate(() => {
+    const btn = Array.from(
+      document.querySelectorAll('button, input[type="submit"]')
+    ).find(
+      (el) =>
+        ["sign in", "login", "log in"].some(
+          (kw) =>
+            el.textContent?.toLowerCase().trim() === kw ||
+            (el as HTMLInputElement).value?.toLowerCase() === kw
+        ) && (el as HTMLElement).offsetParent !== null
+    ) as HTMLElement | null;
+
+    if (btn) {
+      btn.click();
+      return true;
     }
+    return false;
+  });
+
+  if (!clicked) {
+    await page.locator('button[type="submit"]').first().click();
+  }
+
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(1000);
+
+    const url: string = await page.url();
+    if (!url.includes("/login")) {
+      console.log(`    ✅ Logged in — redirected to: ${url}`);
+      break;
+    }
+
+    if (i === 29) {
+      throw new Error("Still on login page after 30s — check credentials");
+    }
+  }
+} else {
+  console.log("    ✅ Already logged in");
+}
 
     // =========================================================
     // OPEN UNBATCHED
