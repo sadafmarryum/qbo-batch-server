@@ -113,106 +113,64 @@ async function deselectAllOnCurrentTab(page: any): Promise<number> {
 
 async function deselectPaymentsOnly(page: any): Promise<number> {
 
-  // ── Step 1: Confirm the Payments tab is actually active ──────────────────
-  const activeTab = page.locator('[data-cy="tab-Payments"] .nav-link.active');
-  if ((await activeTab.count()) === 0) {
+  // ── Step 1: Wait for the Payments header <th> to appear in DOM ──────────
+  await page.waitForSelector("th.payment_exports_report_header_null", {
+    timeout: 30000,
+  });
+
+  // ── Step 2: Resolve the parent <table> of the Payments header <th> ──────
+  const paymentsTable = page
+    .locator("th.payment_exports_report_header_null")
+    .locator("xpath=ancestor::table[1]");
+
+  if ((await paymentsTable.count()) === 0) {
     throw new Error(
-      "Payments tab is not active — cannot safely scope deselection"
+      "Could not locate Payments table via th.payment_exports_report_header_null"
     );
   }
 
-  // ── Step 2: Locate the Payments panel container ──────────────────────────
-  // data-cy naming conventions vary per app; try most-likely patterns first.
-  const panelCandidates = [
-    '[data-cy="panel-Payments"]',
-    '[data-cy="tabpanel-Payments"]',
-    '[data-cy="content-Payments"]',
-    '[data-cy="tab-Payments"] ~ div',   // immediate sibling of tab container
-    '[data-cy="tab-Payments"] + div',
-  ];
+  console.log(
+    "    ✅ Payments table located via th.payment_exports_report_header_null"
+  );
 
-  let panel: any = null;
-
-  for (const sel of panelCandidates) {
-    const loc = page.locator(sel);
-    if ((await loc.count()) > 0 && (await loc.first().isVisible())) {
-      panel = loc.first();
-      console.log(`    ✅ Payments panel found via: ${sel}`);
-      break;
-    }
-  }
-
-  // ── Step 3: Fallback — climb up from the active nav-link and find table ──
-  if (!panel) {
-    console.log(
-      "    ⚠️  No data-cy panel found — using nav-link.active parent strategy"
-    );
-
-    // [data-cy="tab-Payments"] → parent → descendant table
-    panel = page
-      .locator('[data-cy="tab-Payments"]')
-      .locator("..")       // one level up from tab group
-      .locator(">> table") // first visible table descendant
-      .first();
-  }
-
-  if (!panel || (await panel.count()) === 0) {
-    // ── DOM Diagnostic before throwing ──────────────────────────────────────
-    const debug = await page.evaluate(() => {
-      const tab = document.querySelector('[data-cy="tab-Payments"]');
-      if (!tab) return "data-cy=tab-Payments not found in DOM";
-
-      const parent = tab.parentElement;
-      return {
-        tabOuterHTML: tab.outerHTML.slice(0, 300),
-        parentTag: parent?.tagName,
-        parentId: parent?.id,
-        parentDataCy: parent?.getAttribute("data-cy"),
-        siblings: Array.from(parent?.children || []).map(el => ({
-          tag: el.tagName,
-          id: (el as HTMLElement).id,
-          dataCy: el.getAttribute("data-cy"),
-          class: el.className.slice(0, 80),
-        })),
-      };
-    });
-    console.error("DOM diagnostic:", JSON.stringify(debug, null, 2));
-    throw new Error(
-      "Could not locate Payments panel — check DOM diagnostic output above"
-    );
-  }
-
-  // ── Step 4: Deselect header checkbox first (clears all rows at once) ─────
-  const headerCb = panel
-    .locator('thead input[type="checkbox"], th input[type="checkbox"]')
+  // ── Step 3: Try the header checkbox first (clears ALL rows at once) ──────
+  //   Checkbox lives inside th.payment_exports_report_header_null
+  //   with class="custom-checkbox" (from your inspect element)
+  const headerCheckbox = page
+    .locator("th.payment_exports_report_header_null input.custom-checkbox")
     .first();
 
-  if ((await headerCb.count()) > 0 && (await headerCb.isChecked())) {
-    await headerCb.click();
-    await page.waitForTimeout(500); // let Vue reactivity settle
-    console.log("    ✅ Header checkbox deselected — all payments cleared");
+  if (
+    (await headerCheckbox.count()) > 0 &&
+    !(await headerCheckbox.isDisabled()) &&
+    (await headerCheckbox.isChecked())
+  ) {
+    await headerCheckbox.click();
+    await page.waitForTimeout(500);
+    console.log("    ✅ Header checkbox deselected — all payment rows cleared");
     return 1;
   }
 
-  // ── Step 5: Deselect individual checked rows (re-query each time) ─────────
-  // Re-querying prevents stale handles after Vue re-renders the list.
+  // ── Step 4: Deselect individual checked rows scoped to Payments table ────
+  //   Re-query on every iteration so Vue reactivity never gives stale handles
   let deselectedCount = 0;
 
   while (true) {
-    const checked = panel
-      .locator('tbody input[type="checkbox"]:checked')
+    const checked = paymentsTable
+      .locator("tbody input.custom-checkbox:checked")
       .first();
 
     if ((await checked.count()) === 0) break;
 
     await checked.click();
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(150); // let Vue reactivity settle
     deselectedCount++;
   }
 
-  console.log(`    ✅ Deselected ${deselectedCount} payment row(s)`);
+  console.log(`    ✅ Deselected ${deselectedCount} payment row checkbox(es)`);
   return deselectedCount;
 }
+
 
 
 // async function clickTab(page: any, tab: "Invoices" | "Payments") {
